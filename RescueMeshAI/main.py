@@ -3,9 +3,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-
-from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
+
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import requests
@@ -29,6 +29,7 @@ app = FastAPI(
 
 
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -42,6 +43,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=600,
 )
 
 
