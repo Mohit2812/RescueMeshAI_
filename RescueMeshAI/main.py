@@ -33,6 +33,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://rescue-mesh-ai-195l.vercel.app",
         "https://rescue-mesh-ai-1951.vercel.app",
         "https://rescue-mesh-ai-ten.vercel.app",
         "http://localhost:5173",
@@ -43,9 +44,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    max_age=600,
 )
-
 
 
 # MVP persistence only. Replace with PostgreSQL for multi-user/deployed use.
