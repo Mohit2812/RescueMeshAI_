@@ -9,7 +9,7 @@ import { Activity, AlertTriangle, Ambulance, ArrowUpRight, CheckCircle2, Chevron
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
 
-const API = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+const API = (import.meta.env.VITE_API_BASE_URL || 'https://rescuemeshai-mdlk.onrender.com').replace(/\/$/, '')
 const defaultForm = { report: '', address: 'Connaught Place, New Delhi, India', latitude: '28.6139', longitude: '77.2090', reports: '' }
 
 function iconFor(color) {

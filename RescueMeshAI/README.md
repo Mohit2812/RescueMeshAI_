@@ -66,7 +66,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The frontend defaults to `http://127.0.0.1:8000`. To change it, copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL`.
+Open http://localhost:5173. The frontend defaults to `https://rescuemeshai-mdlk.onrender.com`. To change it, copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL`.
 
 ## 3. End-to-end demo
 
