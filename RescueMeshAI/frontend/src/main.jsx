@@ -9,7 +9,10 @@ import { Activity, AlertTriangle, Ambulance, ArrowUpRight, CheckCircle2, Chevron
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
 
-const API = (import.meta.env.VITE_API_BASE_URL || 'https://rescuemeshai-mdlk.onrender.com').replace(/\/$/, '')
+const API = (
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://rescuemeshai-mdlk.onrender.com"
+).replace(/\/+$/, "");
 const defaultForm = { report: '', address: 'Connaught Place, New Delhi, India', latitude: '28.6139', longitude: '77.2090', reports: '' }
 
 function iconFor(color) {
@@ -72,9 +75,15 @@ function App() {
   }
 
   async function checkHealth() {
-    try { await request('/api/health'); setHealth('online') }
-    catch { setHealth('offline') }
+  try {
+    const result = await request("/api/health");
+    console.log("RescueMeshAI health check succeeded:", result);
+    setHealth("online");
+  } catch (error) {
+    console.error("RescueMeshAI health check failed:", error);
+    setHealth("offline");
   }
+}
   useEffect(() => { checkHealth() }, [])
 
   const priority = analysis?.priority?.priority || analysis?.priority?.level || 'unknown'
