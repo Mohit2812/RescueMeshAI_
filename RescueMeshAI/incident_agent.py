@@ -52,7 +52,7 @@ Do not claim that any detail has been independently verified.
                 "content": report[:5000],
             },
         ],
-        max_tokens=800,
+        max_tokens=2800,
     )
 
     content = response.choices[0].message.content

@@ -50,7 +50,7 @@ def assess_priority(incident_data):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": str(incident_data)},
         ],
-        max_tokens=700,
+        max_tokens=2700,
     )
 
     message = response.choices[0].message

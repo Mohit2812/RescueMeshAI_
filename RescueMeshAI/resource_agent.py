@@ -68,7 +68,7 @@ def allocate_resources(
                 "content": json.dumps(payload, ensure_ascii=False),
             },
         ],
-        max_tokens=1800,
+        max_tokens=3800,
         temperature=0.1,
     )
 

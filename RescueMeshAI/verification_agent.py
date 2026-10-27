@@ -150,7 +150,7 @@ Return the required JSON object. Keep the output concise.
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=1600,
+            max_tokens=3600,
             temperature=0.1,
         )
     except Exception as exc:

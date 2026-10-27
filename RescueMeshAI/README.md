@@ -26,6 +26,15 @@ RescueMeshAI/
         └── styles.css
 ```
 
+## Live deployment
+
+- Frontend: https://rescue-mesh-ai-195l.vercel.app/
+- Backend: https://rescuemeshai-mdlk.onrender.com/
+- API docs: https://rescuemeshai-mdlk.onrender.com/docs
+- Health: https://rescuemeshai-mdlk.onrender.com/api/health
+
+The frontend production configuration points to the deployed Render backend. The backend CORS allowlist includes the Vercel origin. Redeploy both services after applying this package's changes. See [DEPLOYMENT_LINKS.md](DEPLOYMENT_LINKS.md).
+
 ## Requirements
 
 - Python 3.10+
@@ -66,7 +75,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The frontend defaults to `https://rescuemeshai-mdlk.onrender.com`. To change it, copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL`.
+Open http://localhost:5173. The frontend defaults to `http://127.0.0.1:8000`. To change it, copy `frontend/.env.example` to `frontend/.env` and set `VITE_API_BASE_URL`.
 
 ## 3. End-to-end demo
 

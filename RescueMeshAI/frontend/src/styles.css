@@ -24,3 +24,39 @@
 .contact-safety-note svg{flex-shrink:0;margin-top:1px}
 .hospital-row small{display:flex;align-items:center;gap:4px}
 @media(max-width:760px){.contacts-grid{grid-template-columns:1fr}.location-entry{grid-template-columns:1fr}.location-entry .btn{width:100%}}
+
+
+/* Location and mission register enhancements */
+.map-coordinate-readout {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: #9fb3ca;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mission-list-panel { margin-bottom: 18px; }
+.mission-list { display: grid; gap: 10px; }
+.mission-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 14px;
+  border: 1px solid var(--border, #263448);
+  border-radius: 12px;
+  background: rgba(255,255,255,.02);
+}
+.mission-list-row.selected {
+  border-color: #60a5fa;
+  background: rgba(96,165,250,.07);
+}
+.mission-list-main { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.mission-list-main b { overflow-wrap: anywhere; }
+.mission-list-main small, .timeline-content small { color: #91a4ba; font-size: 11px; }
+.mission-list-row .btn { flex-shrink: 0; }
+@media (max-width: 700px) {
+  .mission-list-row { align-items: flex-start; flex-wrap: wrap; }
+  .mission-list-main { flex-basis: 100%; }
+}

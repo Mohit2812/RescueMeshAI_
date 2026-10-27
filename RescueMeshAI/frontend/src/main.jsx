@@ -1,6 +1,4 @@
 
-
-
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
@@ -9,10 +7,7 @@ import { Activity, AlertTriangle, Ambulance, ArrowUpRight, CheckCircle2, Chevron
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
 
-const API = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://rescuemeshai-mdlk.onrender.com"
-).replace(/\/+$/, "");
+const API = (import.meta.env.VITE_API_BASE_URL || 'https://rescuemeshai-mdlk.onrender.com').replace(/\/$/, '')
 const defaultForm = { report: '', address: 'Connaught Place, New Delhi, India', latitude: '28.6139', longitude: '77.2090', reports: '' }
 
 function iconFor(color) {
@@ -38,7 +33,7 @@ function MapPanel({ analysis, lat, lon }) {
   const routeLine = routeCoordinates.map(([x,y]) => [y,x])
   const points = [incident, ...hospitals.map(h => [Number(h.latitude), Number(h.longitude)])]
   if (!Number.isFinite(incident[0]) || !Number.isFinite(incident[1])) return <div className="map-placeholder">Enter valid incident coordinates to view the map.</div>
-  return <MapContainer center={incident} zoom={11} scrollWheelZoom className="map">
+  return <MapContainer key={`${incident[0]}-${incident[1]}`} center={incident} zoom={12} scrollWheelZoom className="map">
     <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <FitMap points={points}/>
     <Marker position={incident} icon={incidentIcon}><Popup><b>Incident location</b><br/>Coordinates supplied by operator</Popup></Marker>
@@ -59,6 +54,7 @@ function App() {
   const [incident, setIncident] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [mission, setMission] = useState(null)
+  const [missions, setMissions] = useState([])
   const [operator, setOperator] = useState('Demo operator')
   const [decisionNote, setDecisionNote] = useState('')
   const [tab, setTab] = useState('overview')
@@ -75,15 +71,9 @@ function App() {
   }
 
   async function checkHealth() {
-  try {
-    const result = await request("/api/health");
-    console.log("RescueMeshAI health check succeeded:", result);
-    setHealth("online");
-  } catch (error) {
-    console.error("RescueMeshAI health check failed:", error);
-    setHealth("offline");
+    try { await request('/api/health'); setHealth('online') }
+    catch { setHealth('offline') }
   }
-}
   useEffect(() => { checkHealth() }, [])
 
   const priority = analysis?.priority?.priority || analysis?.priority?.level || 'unknown'
@@ -103,7 +93,27 @@ function App() {
     {name:'Hospital discovery', icon:Hospital, ok:!!analysis?.nearby_hospitals?.success, detail:analysis?.nearby_hospitals?.source || 'No live results'}
   ], [analysis])
 
-  function updateField(key, value) { setForm(prev => ({...prev, [key]:value})) }
+  function updateField(key, value) {
+    setForm(prev => ({...prev, [key]:value}))
+    if (['address', 'latitude', 'longitude'].includes(key)) {
+      // Avoid displaying stale route/hospital results after the incident location changes.
+      setAnalysis(null)
+      setMission(null)
+    }
+  }
+
+  async function loadMissions() {
+    try {
+      const result = await request('/api/missions')
+      setMissions(result.missions || [])
+    } catch (e) {
+      setError(e.message || 'Unable to load missions.')
+    }
+  }
+
+  useEffect(() => {
+    if (tab === 'mission') loadMissions()
+  }, [tab])
 
   async function searchAddress() {
     if (!form.address.trim()) return
@@ -111,6 +121,8 @@ function App() {
     try {
       const found = await request('/api/geocode', {method:'POST', body:JSON.stringify({address:form.address.trim()})})
       setForm(prev => ({...prev, latitude:String(found.latitude), longitude:String(found.longitude), address:found.display_name || prev.address}))
+      setAnalysis(null); setMission(null)
+      setError('')
     } catch(e) { setError(e.message || 'Could not find that location.') }
     finally { setLocationBusy(false) }
   }
@@ -148,7 +160,7 @@ function App() {
   async function generateMission() {
     if (!incident?.id) return
     setBusy(true); setError('')
-    try { const result = await request(`/api/incidents/${incident.id}/mission`, {method:'POST', body:'{}'}); setMission(result); setTab('mission') }
+    try { const result = await request(`/api/incidents/${incident.id}/mission`, {method:'POST', body:'{}'}); setMission(result); setMissions(prev => [result, ...prev.filter(m => m.id !== result.id)]); setTab('mission') }
     catch(e) { setError(e.message) } finally { setBusy(false) }
   }
 
@@ -158,6 +170,7 @@ function App() {
     try {
       const result = await request(`/api/missions/${mission.id}/${action}`, {method:'POST', body:JSON.stringify({operator, note:decisionNote})})
       setMission(result)
+      setMissions(prev => [result, ...prev.filter(m => m.id !== result.id)])
     } catch(e) { setError(e.message) } finally { setBusy(false) }
   }
 
@@ -220,7 +233,8 @@ function App() {
 
           <section className="panel map-panel">
             <SectionTitle eyebrow="GEOSPATIAL VIEW" title="Incident & facilities" action={<Pill kind="info"><span className="mini-dot"/> Map</Pill>}/>
-            {analysis ? <MapPanel analysis={analysis} lat={form.latitude} lon={form.longitude}/> : <div className="map-empty"><div className="map-empty-icon"><Crosshair size={25}/></div><b>Map ready for your incident</b><span>Submit a report to plot the incident, mapped facilities and available route geometry.</span></div>}
+            <MapPanel analysis={analysis} lat={form.latitude} lon={form.longitude}/>
+            <div className="map-coordinate-readout"><MapPin size={14}/> Current pin: {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}{!analysis ? ' · Search a landmark or edit coordinates to move the pin.' : ''}</div>
             <div className="map-legend"><span><i className="legend-dot incident-dot"/> Incident</span><span><i className="legend-dot hospital-dot"/> Directory facility</span><span><i className="legend-line"/> OSRM route</span></div>
             {analysis && <button className="btn secondary full emergency-contact-button" onClick={loadEmergencyContacts} disabled={contactsBusy || !incident}>
               {contactsBusy?<RefreshCw className="spin" size={16}/>:<Phone size={16}/>} Emergency Contacts
@@ -267,13 +281,15 @@ function App() {
 
       {tab==='agents' && <div className="dashboard"><section className="hero-row"><div><span className="eyebrow">TRANSPARENCY</span><h2>Specialists, one mission.</h2><p>Each agent has a bounded role. Missing outputs remain visible instead of being silently invented.</p></div></section><section className="panel"><SectionTitle eyebrow="PIPELINE TRACE" title="Agent activity timeline"/><div className="timeline">{agentStatuses.map((a,i)=><div className="timeline-row" key={a.name}><div className={`timeline-marker ${a.ok?'complete':''}`}>{a.ok?<CheckCircle2 size={16}/>:<Clock3 size={16}/>}</div><div className="timeline-content"><div><b>{a.name}</b><Pill kind={a.ok?'success':'neutral'}>{a.ok?'Completed':'Not run'}</Pill></div><p>{a.detail}</p></div></div>)}</div>{analysis?.agent_errors?.length>0&&<div className="error-list"><b>Agent failures</b>{analysis.agent_errors.map((e,i)=><p key={i}><strong>{e.agent}:</strong> {e.error}</p>)}</div>}{analysis?.duration_seconds!=null&&<div className="latency-note"><Clock3 size={15}/> Pipeline duration: {analysis.duration_seconds}s · AI provider latency may vary.</div>}</section></div>}
 
-      {tab==='mission' && <div className="dashboard"><section className="hero-row"><div><span className="eyebrow">HUMAN APPROVAL GATE</span><h2>Mission control</h2><p>Review the generated plan and record an operator decision. Approval changes the demo mission state only.</p></div>{mission&&<Pill kind={mission.status==='ACTIVE'?'success':mission.status==='REJECTED'?'danger':'warning'}>{mission.status.replaceAll('_',' ')}</Pill>}</section>
+      {tab==='mission' && <div className="dashboard"><section className="hero-row"><div><span className="eyebrow">HUMAN APPROVAL GATE</span><h2>Mission control</h2><p>All registered missions, approval decisions, and closure records. Approval changes the demo mission state only.</p></div>{mission&&<Pill kind={mission.status==='ACTIVE'?'success':mission.status==='REJECTED'||mission.status==='CLOSED'?'danger':'warning'}>{mission.status.replaceAll('_',' ')}</Pill>}</section>
+        <section className="panel mission-list-panel"><SectionTitle eyebrow="MISSION REGISTER" title={`All missions (${missions.length})`} action={<button className="btn secondary" onClick={loadMissions}><RefreshCw size={14}/> Refresh</button>}/>{missions.length ? <div className="mission-list">{missions.map(m => <article className={`mission-list-row ${mission?.id===m.id?'selected':''}`} key={m.id}><div className="mission-list-main"><b>{m.incident?.incident_type || m.incident?.location || 'Emergency incident'}</b><small>ID {m.id.slice(0,8)} · Registered {m.created_at ? new Date(m.created_at).toLocaleString() : 'time unavailable'}</small><small>Updated {m.updated_at ? new Date(m.updated_at).toLocaleString() : '—'}</small></div><Pill kind={m.status==='ACTIVE'?'success':m.status==='CLOSED' || m.status==='REJECTED'?'danger':'warning'}>{m.status.replaceAll('_',' ')}</Pill><button className="btn secondary" onClick={async()=>{try{const full=await request(`/api/missions/${m.id}`);setMission(full);setDecisionNote(full.decision_note||'')}catch(e){setError(e.message)}}}>Details <ChevronRight size={15}/></button></article>)}</div> : <p className="muted">No missions registered yet. Analyze an incident and choose “Generate mission for review”.</p>}</section>
         {!mission ? <section className="panel empty-mission"><div className="map-empty-icon"><Radio size={24}/></div><h3>No mission awaiting review</h3><p>Analyze an incident in the command center, then select “Generate mission for review”.</p><button className="btn primary" onClick={()=>setTab('overview')}>Go to command center <ChevronRight size={16}/></button></section> :
-          <><section className="panel"><SectionTitle eyebrow={`MISSION ${mission.id.slice(0,8).toUpperCase()}`} title="Rescue mission plan"/><div className="mission-overview"><div><span>Priority</span><b className={`priority-text ${String(mission.priority?.priority||'unknown').toLowerCase()}`}>{String(mission.priority?.priority||'unknown').toUpperCase()}</b></div><div><span>Incident</span><b>{mission.incident?.incident_type||'Unknown incident'}</b></div><div><span>Route</span><b>{mission.route?.routes?.[0]?`${mission.route.routes[0].distance_km} km / ${mission.route.routes[0].duration_minutes} min`:'Unavailable — manual routing required'}</b></div><div><span>Hospital records</span><b>{mission.nearby_hospitals?.count ?? 0} · availability unconfirmed</b></div></div><div className="mission-columns"><div><h3><Ambulance size={17}/> Resource recommendation</h3>{(mission.resources?.required_resources||[]).length?(mission.resources.required_resources).map((r,i)=><div className="resource-row" key={i}><span>{r.resource}</span><b>× {r.quantity}</b><small>{r.reason||'Planning estimate'}</small></div>):<p className="muted">Resource plan unavailable; manual coordination required.</p>}{resourceGaps.length>0&&<div className="warning-inline">Resource gaps were flagged by the agent. Confirm actual inventory before assignment.</div>}</div><div><h3><Hospital size={17}/> Hospital candidates</h3>{(mission.nearby_hospitals?.hospitals||[]).slice(0,5).map(h=><div className="hospital-row" key={h.id}><div><b>{h.name}</b><small>{h.address||'Address not provided'}</small><small>{h.distance_km} km straight-line · {h.source}</small><small><Phone size={11}/> {h.phone || 'Phone number not listed'}</small></div><Pill kind="neutral">Directory listing</Pill></div>)}{!mission.nearby_hospitals?.count&&<p className="muted">No hospital records available. Contact local emergency coordination for verified options.</p>}</div></div></section>
-          <section className="panel approval-panel"><SectionTitle eyebrow="OPERATOR DECISION" title="Approve, modify externally, or reject"/><div className="field-grid"><div><label>Operator name</label><input value={operator} onChange={e=>setOperator(e.target.value)} required minLength={2}/></div><div><label>Decision note</label><input value={decisionNote} onChange={e=>setDecisionNote(e.target.value)} placeholder="Add rationale or required changes"/></div></div><div className="approval-actions"><button className="btn danger-outline" disabled={busy||mission.status!=='PENDING_APPROVAL'} onClick={()=>decide('reject')}><XCircle size={16}/> Reject plan</button><button className="btn primary" disabled={busy||mission.status!=='PENDING_APPROVAL'} onClick={()=>decide('approve')}><CheckCircle2 size={16}/> Approve demo mission</button></div><p className="muted tiny">This prototype records a simulated approval state only; it does not dispatch responders.</p></section></>}
+          <><section className="panel"><SectionTitle eyebrow={`MISSION ${mission.id.slice(0,8).toUpperCase()}`} title="Rescue mission plan"/><div className="mission-overview"><div><span>Priority</span><b className={`priority-text ${String(mission.priority?.priority||'unknown').toLowerCase()}`}>{String(mission.priority?.priority||'unknown').toUpperCase()}</b></div><div><span>Incident</span><b>{mission.incident?.incident_type||'Unknown incident'}</b></div><div><span>Route</span><b>{mission.route?.routes?.[0]?`${mission.route.routes[0].distance_km} km / ${mission.route.routes[0].duration_minutes} min`:'Unavailable — manual routing required'}</b></div><div><span>Hospital records</span><b>{mission.nearby_hospitals?.count ?? 0} · availability unconfirmed</b></div></div><div className="mission-columns"><div><h3><Ambulance size={17}/> Resource recommendation</h3>{(mission.resources?.required_resources||[]).length?(mission.resources.required_resources).map((r,i)=><div className="resource-row" key={i}><span>{r.resource}</span><b>× {r.quantity}</b><small>{r.reason||'Planning estimate'}</small></div>):<p className="muted">Resource plan unavailable; manual coordination required.</p>}{(mission.resources?.resource_gaps||[]).length>0&&<div className="warning-inline">Resource gaps were flagged by the agent. Confirm actual inventory before assignment.</div>}</div><div><h3><Hospital size={17}/> Hospital candidates</h3>{(mission.nearby_hospitals?.hospitals||[]).slice(0,5).map(h=><div className="hospital-row" key={h.id}><div><b>{h.name}</b><small>{h.address||'Address not provided'}</small><small>{h.distance_km} km straight-line · {h.source}</small><small><Phone size={11}/> {h.phone || 'Phone number not listed'}</small></div><Pill kind="neutral">Directory listing</Pill></div>)}{!mission.nearby_hospitals?.count&&<p className="muted">No hospital records available. Contact local emergency coordination for verified options.</p>}</div></div></section>
+          <section className="panel approval-panel"><SectionTitle eyebrow="OPERATOR DECISION" title="Approve, modify externally, or reject"/><div className="field-grid"><div><label>Operator name</label><input value={operator} onChange={e=>setOperator(e.target.value)} required minLength={2}/></div><div><label>Decision note</label><input value={decisionNote} onChange={e=>setDecisionNote(e.target.value)} placeholder="Add rationale or required changes"/></div></div><div className="approval-actions"><button className="btn danger-outline" disabled={busy||mission.status!=='PENDING_APPROVAL'} onClick={()=>decide('reject')}><XCircle size={16}/> Reject plan</button><button className="btn primary" disabled={busy||mission.status!=='PENDING_APPROVAL'} onClick={()=>decide('approve')}><CheckCircle2 size={16}/> Approve demo mission</button><button className="btn secondary" disabled={busy||mission.status!=='ACTIVE'} onClick={()=>decide('close')}><CheckCircle2 size={16}/> Close mission</button></div><p className="muted tiny">This prototype records simulated status changes only; it does not dispatch responders.</p></section>
+          <section className="panel"><SectionTitle eyebrow="AUDIT TRAIL" title="Registration & decision history"/>{(mission.history||[]).length ? <div className="timeline">{mission.history.map((event,i)=><div className="timeline-row" key={`${event.timestamp}-${i}`}><div className="timeline-marker complete"><Clock3 size={15}/></div><div className="timeline-content"><div><b>{String(event.action||'UPDATE').replaceAll('_',' ')}</b><small>{event.timestamp ? new Date(event.timestamp).toLocaleString() : 'Timestamp unavailable'}</small></div><p>By: {event.by || 'Unknown operator'}{event.note ? ` · ${event.note}` : ''}</p></div></div>)}</div> : <p className="muted">No audit history available for this mission.</p>}{mission.closed_at&&<p className="muted">Closed at: {new Date(mission.closed_at).toLocaleString()} by {mission.closed_by||'operator'}</p>}</section></>}
       </div>}
 
-      <footer className="app-footer"><span>RescueMesh AI <b>·</b> Hackathon MVP</span><span><ShieldCheck size={14}/> Human approval required <b>·</b> No autonomous dispatch</span></footer>
+      <footer className="app-footer"><span>RescueMesh AI <b>·</b> Hackathon MVP <b>·</b> <a href="https://rescue-mesh-ai-195l.vercel.app/" target="_blank" rel="noreferrer">Live frontend</a> <b>·</b> <a href="https://rescuemeshai-mdlk.onrender.com/" target="_blank" rel="noreferrer">Backend API</a> <b>·</b> <a href={`${API}/docs`} target="_blank" rel="noreferrer">API docs</a></span><span><ShieldCheck size={14}/> Human approval required <b>·</b> No autonomous dispatch</span></footer>
     </main>
   </div>
 }

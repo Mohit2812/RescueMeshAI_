@@ -3,9 +3,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
 
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import requests
@@ -27,25 +27,19 @@ app = FastAPI(
     version="1.1.0",
 )
 
-
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://rescue-mesh-ai-195l.vercel.app",
-        "https://rescue-mesh-ai-1951.vercel.app",
-        "https://rescue-mesh-ai-ten.vercel.app",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://rescue-mesh-ai-195l.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # MVP persistence only. Replace with PostgreSQL for multi-user/deployed use.
 INCIDENTS: dict[str, dict[str, Any]] = {}
@@ -252,6 +246,13 @@ def create_mission(incident_id: str):
         "status": "PENDING_APPROVAL",
         "created_at": _now(),
         "updated_at": _now(),
+        "closed_at": None,
+        "history": [{
+            "action": "REGISTERED",
+            "by": "System",
+            "note": "Mission registered and submitted for operator approval.",
+            "timestamp": _now(),
+        }],
         "priority": analysis.get("priority", {}),
         "incident": analysis.get("incident", {}),
         "resources": analysis.get("resources", {}),
@@ -268,6 +269,19 @@ def create_mission(incident_id: str):
     item["status"] = "MISSION_PENDING_APPROVAL"
     item["updated_at"] = _now()
     return mission
+
+
+@app.get("/api/missions")
+def list_missions():
+    """List missions newest-first for Mission Control."""
+    return {
+        "missions": sorted(
+            MISSIONS.values(),
+            key=lambda mission: mission.get("created_at", ""),
+            reverse=True,
+        ),
+        "count": len(MISSIONS),
+    }
 
 
 @app.get("/api/missions/{mission_id}")
@@ -289,6 +303,12 @@ def approve_mission(mission_id: str, decision: MissionDecision):
     mission["approved_by"] = decision.operator
     mission["decision_note"] = decision.note
     mission["updated_at"] = _now()
+    mission.setdefault("history", []).append({
+        "action": "APPROVED",
+        "by": decision.operator,
+        "note": decision.note,
+        "timestamp": mission["updated_at"],
+    })
     return mission
 
 
@@ -303,6 +323,33 @@ def reject_mission(mission_id: str, decision: MissionDecision):
     mission["approved_by"] = decision.operator
     mission["decision_note"] = decision.note
     mission["updated_at"] = _now()
+    mission.setdefault("history", []).append({
+        "action": "REJECTED",
+        "by": decision.operator,
+        "note": decision.note,
+        "timestamp": mission["updated_at"],
+    })
+    return mission
+
+
+@app.post("/api/missions/{mission_id}/close")
+def close_mission(mission_id: str, decision: MissionDecision):
+    mission = MISSIONS.get(mission_id)
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    if mission["status"] != "ACTIVE":
+        raise HTTPException(status_code=409, detail="Only active missions can be closed")
+    mission["status"] = "CLOSED"
+    mission["closed_at"] = _now()
+    mission["updated_at"] = mission["closed_at"]
+    mission["closed_by"] = decision.operator
+    mission["decision_note"] = decision.note
+    mission.setdefault("history", []).append({
+        "action": "CLOSED",
+        "by": decision.operator,
+        "note": decision.note,
+        "timestamp": mission["closed_at"],
+    })
     return mission
 
 
